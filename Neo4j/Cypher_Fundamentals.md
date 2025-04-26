@@ -186,3 +186,208 @@ We can run the following code to return all the property keys defined in the gra
 ```sql
 CALL db.propertyKeys()
 ```
+
+## Creating Nodes
+
+Using the Movies data model, we can create and execute Cypher code to create actors and movies in our graph.
+
+Suppose we want to create a node to represent *Bin Liu*:
+```sql
+MERGE (p:Person {name: 'Bin Liu'})
+```
+It will create a single node in the graph. We must specify at least one property that will be the unique primary key for the node. To verify that the node was created:
+```sql
+MATCH (p:Person {name: 'Bin Liu'})
+RETURN p
+```
+
+We can also chain multiple `MERGE` clauses together:
+```sql
+MERGE (p:Person {name: 'Bin Liu'})
+MERGE (m:Movie {title: 'The Underdog'})
+RETURN p, m
+```
+Since we have specified the variables `p` and `m`, we can use them in the `RETURN` clause to return both nodes.
+
+### Using `CREATE` instead of `MERGE`
+The `CREATE` keyword is used to create a node in the graph. The difference between `CREATE` and `MERGE` is that `CREATE` will create a new node every time it is executed, while `MERGE` will only create a new node if it does not already exist in the graph.
+
+We can use `CREATE` if we are sure our data is clean and we want greater speed during import.
+
+## Creating Relationships
+
+We still use `MERGE` to create relationships between two nodes. First, we must have references to the two nodes we will be connecting. Then the relationship must have a type and a direction.
+
+Suppose the `Person` and `Movie` nodes both already exist, we can find them using a `MATCH` clause and then create a relationship between them using the `MERGE` keyword:
+```sql
+MATCH (p:Person {name: 'Bin Liu'})
+MATCH (m:Movie {title: 'The Underdog'})
+MERGE (p)-[:ACTED_IN]->(m)
+```
+This query will create a relationship between the two nodes if it does not already exist.
+
+To confirm this relationship exists,
+```sql
+MATCH (p:Person {name: 'Bin Liu'})-[:ACTED_IN]-(m:Movie {title: 'The Underdog'})
+RETURN p, m
+```
+Here, we do not need to specify the direction in the `MATCH` pattern since the query engine will look for all nodes that are connected, regardless of the direction of the relationship. If we specify the direction pattern:
+```sql
+MATCH (p:Person {name: 'Bin Liu'})<-[:ACTED_IN]-(m:Movie {title: 'The Underdog'})
+RETURN p, m
+```
+This query will not return any results because the direction of the relationship is reversed.
+
+We can also chain multiple `MERGE` clauses together:
+```sql
+MERGE (p:Person {name: 'Bin Liu'})
+MERGE (m:Movie {title: 'The Underdog'})
+MERGE (p)-[:ACTED_IN]-(m)
+```
+This query will create a `Person` node, a `Movie` node, and a relationship between them. NOTE that we did not specify the direction of the relationship. By default, if we do not specify the direction when creating the relationship, it will always be assumed left-to-right. To confirm this:
+```sql
+MATCH (p:Person {name: 'Bin Liu'})-[:ACTED_IN]-(m:Movie {title: 'The Underdog'})
+RETURN p, m
+```
+
+We can also use `MERGE` to create nodes and relationships in single clause:
+```sql
+MERGE (p:Person {name: 'Bin Liu'})-[:ACTED_IN]->(m:Movie {title: 'The Underdog'})
+RETURN p, m
+```
+
+## Updating Properties
+
+### Adding properties inline
+We can set properties for nodes and relationships when we create them:
+```sql
+MATCH (p:Person {name: 'Bin Liu'})
+MERGE (m:Movie {title: 'The Underdog'})
+MERGE (p)-[:ACTED_IN {roles: ['Lead Actor]}]->(m)
+RETURN p, m
+```
+For inline property setting, we use the JSON-style of adding the property key-value pairs.
+
+The other way to set properties is to use the `SET` keyword. In the context of particular `MERGE` or `MATCH` clauses where we have defined a variable to reference the node or relationship, we can set property values.
+```sql
+MATCH (p:Person)-[r:ACTED_IN]->(m:Movie)
+WHERE p.name = 'Bin Liu' AND m.title = 'The Underdog'
+SET r.roles = ['Lead Actor']
+RETURN p, r, m
+```
+
+We can set multiple properties by separating them with a comma,
+```sql
+MATCH (p:Person)-[r:ACTED_IN]->(m:Movie)
+WHERE p.name = 'Bin Liu' AND m.title = 'The Underdog'
+SET r.roles = ['Lead Actor'], m.released = 2025
+RETURN p, r, m
+```
+
+If we have a reference to a node or relationship, we can also use `SET` to modify the property:
+```sql
+MATCH (p:Person)-[r:ACTED_IN]->(m:Movie)
+WHERE p.name = 'Bin Liu' AND m.title = 'The Underdog'
+SET r.roles = ['Lead Actress]
+RETURN p, r, m
+```
+
+To remove or delete a property from a node or relationship, we can use the `REMOVE` keyword or setting the property to `null`:
+```sql
+MATCH (p:Person)-[r:ACTED_IN]->(m:Movie)
+WHERE p.name = 'Bin Liu' AND m.title = 'The Underdog'
+REMOVE r.roles
+RETURN p, r, m
+```
+or
+```sql
+MATCH (p:Person)-[r:ACTED_IN]->(m:Movie)
+WHERE p.name = 'Bin Liu' AND m.title = 'The Underdog'
+SET r.roles = null
+RETURN p, r, m
+```
+
+NOTE: **We should never remove the property that is used as the primary key for a node.**
+
+## Merge Processing
+The `MERGE` operations work by first trying to find a pattern in the graph. If the pattern is found then the data already exists and is not created. If the pattern is not found, then the data can be created.
+
+We can also specify behavior at runtime that enables us to set properties when the node is created or when the node is found. We can use the `ON CREATE SET` or `ON MATCH SET` conditions, or the `SET` keywords to set any additional properties.
+
+For example, if the `Person` node for *Bin Liu* does not exist, it is created and the `createdAt` property is set. If the node is found, then the `updatedAt` property is set. In both cases, the `born` property is set.
+```sql
+MERGE (p:Person {name: 'Bin Liu'})
+
+ON CREATE SET p.createdAt = datetime()
+
+ON MATCH SET p.updatedAt = datetime()
+
+SET p.born = 2025
+
+RETURN p
+```
+If we run this query multiple times, we will see that the `createdAt` property is set only once, while the `updatedAt` property is set every time the node is found. The basic idea is that we can use `ON CREATE` and `ON MATCH` with `SET` to set properties on the node or relationship when it is created or found.
+
+## Deleting Data
+Suppose we have created a `Person` node for *Bin Liu*. To delete this node, we need to first retrieve the node and then delete it using the `DELETE` keyword:
+```sql
+MATCH (p:Person {name: 'Bin Liu'})
+DELETE p
+```
+
+Suppose we have created a `Person` node for *Bin Liu* and a `Movie` node for *The Underdog* where *Bin Liu* acted in the movie. To leave the *Bin Liu* node in the graph but remove the relationship, we can retrieve the relationship and delete it:
+```sql
+MATCH (p:Person {name: 'Bin Liu'})-[r:ACTED_IN]->(m:Movie {title: 'The Underdog'})
+DELETE r
+RETURN p, m
+```
+
+Again, suppose we have recreates the relationship between *Bin Liu* and *The Underdog*. If we attempt to delete the *Bin Liu* node, we will receive an error because it has relationships in the graph:
+```sql
+MATCH (p:Person {name: 'Bin Liu'})
+DELETE p
+```
+
+**Neo4j provides a feature where we cannot delete a node if it has incoming or outgoing relationships. This prevents the graph from having orphaned relationships.**
+
+To delete a node with relationships, we must first delete the relationships. We can use the `DETACH DELETE` clause:
+```sql
+MATCH (p:Person {name: 'Bin Liu'})
+DETACH DELETE p
+```
+
+To delete all nodes and relationships in a database:
+```sql
+MATCH (n)
+DETACH DELETE n
+```
+
+### Deleting labels
+A best practice is to have at least one label for a node.
+```sql
+MERGE (p:Person {name: 'Bin Liu'})
+RETURN p
+```
+This query will create the `Person` node in the graph.
+```sql
+MATCH (p:Person {name: 'Bin Liu'})
+SET p:Developer
+RETURN p
+```
+This query will add the `Developer` label to the `Person` node. We can use the new label to filter the query:
+```sql
+MATCH (p:Developer {name: 'Bin Liu'})
+RETURN p
+```
+
+To remove the newly-added label, `Developer`, we can use the `REMOVE` clause:
+```sql
+MATCH (p:Person {name: 'Bin Liu'})
+REMOVE p:Developer
+RETURN p
+```
+
+We can find out what labels exist in the graph using the `CALL` command:
+```sql
+CALL db.labels()
+```

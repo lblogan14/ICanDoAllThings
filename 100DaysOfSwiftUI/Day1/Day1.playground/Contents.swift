@@ -93,24 +93,3 @@ print(name2)
 
 var rating = 5.0
 rating *= 2
-
-// boolean
-let filename2 = "basketball.jpg"
-print(filename.hasSuffix(".jpg"))
-let num = 120
-print(num.isMultiple(of: 4))
-
-let goodDogs = true
-let startOver = false
-let isMultiple = 120.isMultiple(of: 3)
-
-var isAuthenticated = false
-isAuthenticated = !isAuthenticated
-print(isAuthenticated)
-isAuthenticated = !isAuthenticated
-print(isAuthenticated)
-
-var gameOver = false
-print(gameOver)
-gameOver.toggle()
-print(gameOver)

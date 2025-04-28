@@ -6,7 +6,7 @@ We should install Xcode >=15.0 from the Mac AppStore, and we will use a **Swift 
 
 When we first create a blank `.playground` file, it contains the default template like:
 
-<img src="/Users/binliu/Documents/100DaysOfSwiftUI/Day1/imgs/create_var.png" alt="default_hello" style="zoom:50%;" />
+<img src="imgs/create_var.png" alt="default_hello" style="zoom:50%;" />
 
 Swift gives us two ways of storing data.
 
@@ -40,7 +40,7 @@ let character = "Babeface"
 character = "Artist on Court"
 ```
 
-<img src="/Users/binliu/Documents/100DaysOfSwiftUI/Day1/imgs/change_const_error.png" alt="change_const_error" style="zoom:50%;" />
+<img src="imgs/change_const_error.png" alt="change_const_error" style="zoom:50%;" />
 
 To print out the value of any variable, we can use `print()` function. Users cannot see what is printed, but it is helpful to check values.
 
@@ -218,7 +218,7 @@ let c = a + b
 
 By doing so, we will have an error
 
-<img src="/Users/binliu/Documents/100DaysOfSwiftUI/Day1/imgs/add_int_to_decimal.png" alt="add_int_to_decimal" style="zoom:50%;" />
+<img src="imgs/add_int_to_decimal.png" alt="add_int_to_decimal" style="zoom:50%;" />
 
 This is called *type safety*: Swift will NOT let us mix different types of data by accident.
 
@@ -256,7 +256,7 @@ name = 57
 
 This throws an error:
 
-<img src="/Users/binliu/Documents/100DaysOfSwiftUI/Day1/imgs/change_data_type.png" alt="change_data_type" style="zoom:50%;" />
+<img src="imgs/change_data_type.png" alt="change_data_type" style="zoom:50%;" />
 
 We can also apply compound assignment operators to decimal numbers:
 

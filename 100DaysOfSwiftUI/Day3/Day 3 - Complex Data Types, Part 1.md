@@ -151,7 +151,7 @@ print(player["team"])
 
 If we try this in a playground, we will see Xcode throws up various warnings along the lines of `"Expression implicitly coerced from 'String?' to 'Any'"`
 
-<img src="/Users/binliu/Documents/100DaysOfSwiftUI/Day3/imgs/warning.png" alt="warning" style="zoom:50%;" />
+<img src="imgs/warning.png" alt="warning" style="zoom:50%;" />
 
 If we look at the output from our playground, we will see it prints `Optional("Steph Curry")` rather than just `Steph Curry`.
 

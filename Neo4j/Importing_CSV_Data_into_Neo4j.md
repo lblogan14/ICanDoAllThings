@@ -307,3 +307,422 @@ We can use the `apoc.meta.nodeTypeProperties()` function to show the data types 
 CALL apoc.meta.nodeTypeProperties()
 YIELD nodeType, propertyName, propertyTypes
 ```
+
+NOTE: Neo4j will return the data type `Long` for integers.
+
+### Person node dates
+The `Person` nodes have the properties `born` and `died`, which are dates instead of strings. They should be cast to `Date` data types:
+```sql
+LOAD CSV WITH HEADERS 
+FROM 'https://data.neo4j.com/importing-cypher/persons.csv' AS row
+MERGE (p:Person {tmdbId: toInteger(row.person_tmdbId)})
+SET
+    p.imdbId = toInteger(row.person_imdb),
+    p.bornIn = row.bornIn,
+    p.name = row.name,
+    p.bio = row.bio,
+    p.poster = row.person_poster,
+    p.url = row.person_url,
+    p.born = date(row.born),
+    p.died = date(row.died)
+```
+To verify the data types of the properties, we can run:
+```sql
+CALL apoc.meta.nodeTypeProperties()
+YIELD nodeType, propertyName, propertyTypes
+```
+
+The `Date` data type allows us to extract the `year`, `month`, and `day` from the data. For example,
+```sql
+MATCH (p:Person)
+RETURN p.born.year as YearOfBirth
+```
+
+### Movie node dates and budgets
+The `year` and `budget` properties of the `Movie` nodes should not be strings, and we should cast them to `Integer` data types:
+```sql
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/movies.csv' AS row
+MERGE (m:Movie {movieId: toInteger(row.movieId)})
+SET
+    m.tmdbId = toInteger(row.movie_tmdbId),
+    m.imdbId = toInteger(row.movie_imdbId),
+    m.released = row.released,
+    m.title = row.title,
+    m.plot = row.plot,
+    m.year = toInteger(row.year),
+    m.budget = toInteger(row.budget)
+```
+
+The `movies.csv` file also contains:
+- `imdbRating`
+- `movie_poster`
+- `runtime`
+- `imdbVotes`
+- `revenue`
+- `movie_url`
+
+We can add these properties to the `Movie` nodes:
+```sql
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/movies.csv' AS row
+MERGE (m:Movie {movieId: toInteger(row.movieId)})
+SET
+    m.imdbRating = toFloat(row.imdbRating),
+    m.poster = row.movie_poster,
+    m.runtime = toInteger(row.runtime),
+    m.imdbVotes = toInteger(row.imdbVotes),
+    m.revenue = toInteger(row.revenue),
+    m.url = row.movie_url
+```
+Now we can check the data types of the properties:
+```sql
+CALL apoc.meta.nodeTypeProperties()
+YIELD nodeType, propertyName, propertyTypes
+```
+
+### Lists
+A multi-value property is a property that can hold one or more values. Neo4j represents this type of data as a list (or `StringArray`). All values in a list must have the same data type.
+
+The `movies.csv` data file contains multi-value properties:
+- `countries` - the countries which produced the movie
+- `languages` - the languages spoken in the movie
+
+They are separated by a pipe (`|`):
+```csv
+USA|France|Italy|Germany
+English|Mandarin|Russian
+```
+
+We can use the `split()` function to transform a string value into a list with a delimiter:
+```sql
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/movies.csv' AS row
+MERGE (m:Movie {movieId: toInteger(row.movieId)})
+SET
+    m.tmdbId = toInteger(row.movie_tmdbId),
+    m.imdbId = toInteger(row.movie_imdbId),
+    m.released = date(row.released),
+    m.title = row.title,
+    m.year = toInteger(row.year),
+    m.plot = row.plot,
+    m.budget = toInteger(row.budget),
+    m.imdbRating = toFloat(row.imdbRating),
+    m.poster = row.movie_poster,
+    m.runtime = toInteger(row.runtime),
+    m.imdbVotes = toInteger(row.imdbVotes),
+    m.revenue = toInteger(row.revenue),
+    m.url = row.movie_url,
+    m.countries = split(row.countries, '|')
+```
+The last line sets the `countries` property as a list by splitting the data from the CSV file by the `|` character.
+
+We can query data in a list using the `IN` operator. For example,
+```sql
+MATCH (m:Movie)
+WHERE "France" IN m.countries
+RETURN m
+```
+
+Now we can add the `languages` property to the `Movie` nodes:
+```sql
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/movies.csv' AS row
+MERGE (m:Movie {movieId: toInteger(row.movieId)})
+SET
+    m.languages = split(row.languages, '|')
+```
+
+### Labels
+Adding labels to existing nodes can make our graph more useful and performant.
+
+The `Person` nodes in the graph right now represent both actors and directors. To determine if a person is an actor or director, we need to query the `ACTED_IN` and `DIRECTED` relationships. Alternatively, we can add labels to the `Person` nodes to distinguish between actors and directors.
+
+For example, We can add the `Actor` label to all `Person` nodes that have acted in a movie:
+```sql
+MATCH (p:Person)[:ACTED_IN]->()
+SET p:Actor
+```
+This query finds all `Person` nodes with an `ACTED_IN` relationship and sets the `Actor` label on those nodes.
+
+As there are people in the database who have acted in more than one movie, we can use `WITH DISTINCT` to ensure that each person is only labeled once. Although not necessary, this will improve performance:
+```sql
+MATCH (p:Person)-[:ACTED_IN]->()
+WITH DISTINCT p SET p:Actor
+```
+We can confirm the labels have been added by running:
+```sql
+MATCH (a:Actor) RETURN a LIMIT 25
+```
+By adding the `Actor` label to the graph, queries that use the label rather than the relationship will be faster to return.
+
+Now we can add the `Director` label to all `Person` nodes that have directed a movie:
+```sql
+MATCH (p:Person)-[:DIRECTED]->()
+WITH DISTINCT p SET p:Director
+```
+
+## Importing Data Considerations
+As a recap, we 
+- create `Person` and `Movie` constraints
+- import data from `persons.csv` to create `Person` nodes
+- import data from `movies.csv` to create `Movie` nodes
+- create `ACTED_IN` and `DIRECTED` relationships between `Person` and `Movie` nodes
+- create additional `Actor` and `Director` labels on `Person` nodes
+
+```sql
+CREATE CONSTRAINT Person_tmdbId IF NOT EXISTS
+FOR (x:Person)
+REQUIRE x.tmdbId IS UNIQUE;
+
+CREATE CONSTRAINT Movie_movieId IF NOT EXISTS
+FOR (x:Movie)
+REQUIRE x.movieId IS UNIQUE;
+
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/persons.csv' AS row
+MERGE (p:Person {tmdbId: toInteger(row.person_tmdbId)})
+SET
+p.imdbId = toInteger(row.person_imdbId),
+p.bornIn = row.bornIn,
+p.name = row.name,
+p.bio = row.bio,
+p.poster = row.poster,
+p.url = row.url,
+p.born = date(row.born),
+p.died = date(row.died);
+
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/movies.csv' AS row
+MERGE (m:Movie {movieId: toInteger(row.movieId)})
+SET
+m.tmdbId = toInteger(row.movie_tmdbId),
+m.imdbId = toInteger(row.movie_imdbId),
+m.released = date(row.released),
+m.title = row.title,
+m.year = toInteger(row.year),
+m.plot = row.plot,
+m.budget = toInteger(row.budget),
+m.imdbRating = toFloat(row.imdbRating),
+m.poster = row.poster,
+m.runtime = toInteger(row.runtime),
+m.imdbVotes = toInteger(row.imdbVotes),
+m.revenue = toInteger(row.revenue),
+m.url = row.url,
+m.countries = split(row.countries, '|'),
+m.languages = split(row.languages, '|');
+
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/acted_in.csv' AS row
+MATCH (p:Person {tmdbId: toInteger(row.person_tmdbId)})
+MATCH (m:Movie {movieId: toInteger(row.movieId)})
+MERGE (p)-[r:ACTED_IN]->(m)
+SET r.role = row.role;
+
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/directed.csv' AS row
+MATCH (p:Person {tmdbId: toInteger(row.person_tmdbId)})
+MATCH (m:Movie {movieId: toInteger(row.movieId)})
+MERGE (p)-[r:DIRECTED]->(m);
+
+MATCH (p:Person)-[:ACTED_IN]->()
+WITH DISTINCT p SET p:Actor;
+
+MATCH (p:Person)-[:DIRECTED]->()
+WITH DISTINCT p SET p:Director;
+```
+All the queries are independent of each other and do not form a single process.
+
+### Multiple queries
+To run multiple queries together, we must put a semi-colon (`;`) at the end of each query. For example,
+```sql
+MATCH (p:Person) RETURN p;
+MATCH (m:Movie) RETURN m;
+```
+
+### Resetting the data
+Before re-running the import process, we must delete any existing data and drop any constraints.
+
+To delete the `ACTED_IN` and `DIRECTED` relationships, we can run:
+```sql
+MATCH (Person)-[r:ACTED_IN]->(Movie)
+DELETE r;
+MATCH (Person)-[r:DIRECTED]->(Movie)
+DELETE r;
+```
+
+Once the relationships are deleted, we can delete the `Person` and `Movie` nodes:
+```sql
+MATCH (p:Person) DELETE p;
+MATCH (m:Movie) DELETE m;
+```
+
+Alternatively, we can use `DETACH DELETE` to delete the nodes and relationship at the same time:
+```sql
+MATCH (p:Person) DETACH DELETE p;
+MATCH (m:Movie) DETACH DELETE m;
+```
+
+If there are any constraints, we can drop them using:
+```sql
+DROP CONSTRAINT Person_tmdbId IF EXISTS;
+DROP CONSTRAINT Movie_movieId IF EXISTS;
+```
+
+These queries reset the database and allow use to re-run the import process.
+
+### Importing the data
+If we combine all previous queries into a single query, we can run the import process in one go:
+```sql
+MATCH (p:Person) DETACH DELETE p;
+MATCH (m:Movie) DETACH DELETE m;
+
+DROP CONSTRAINT Person_tmdbId IF EXISTS;
+DROP CONSTRAINT Movie_movieId IF EXISTS;
+
+CREATE CONSTRAINT Person_tmdbId IF NOT EXISTS
+FOR (x:Person)
+REQUIRE x.tmdbId IS UNIQUE;
+
+CREATE CONSTRAINT Movie_movieId IF NOT EXISTS
+FOR (x:Movie)
+REQUIRE x.movieId IS UNIQUE;
+
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/persons.csv' AS row
+MERGE (p:Person {tmdbId: toInteger(row.person_tmdbId)})
+SET
+p.imdbId = toInteger(row.person_imdbId),
+p.bornIn = row.bornIn,
+p.name = row.name,
+p.bio = row.bio,
+p.poster = row.poster,
+p.url = row.url,
+p.born = date(row.born),
+p.died = date(row.died);
+
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/movies.csv' AS row
+MERGE (m:Movie {movieId: toInteger(row.movieId)})
+SET
+m.tmdbId = toInteger(row.movie_tmdbId),
+m.imdbId = toInteger(row.movie_imdbId),
+m.released = date(row.released),
+m.title = row.title,
+m.year = toInteger(row.year),
+m.plot = row.plot,
+m.budget = toInteger(row.budget),
+m.imdbRating = toFloat(row.imdbRating),
+m.poster = row.poster,
+m.runtime = toInteger(row.runtime),
+m.imdbVotes = toInteger(row.imdbVotes),
+m.revenue = toInteger(row.revenue),
+m.url = row.url,
+m.countries = split(row.countries, '|'),
+m.languages = split(row.languages, '|');
+
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/acted_in.csv' AS row
+MATCH (p:Person {tmdbId: toInteger(row.person_tmdbId)})
+MATCH (m:Movie {movieId: toInteger(row.movieId)})
+MERGE (p)-[r:ACTED_IN]->(m)
+SET r.role = row.role;
+
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/directed.csv' AS row
+MATCH (p:Person {tmdbId: toInteger(row.person_tmdbId)})
+MATCH (m:Movie {movieId: toInteger(row.movieId)})
+MERGE (p)-[r:DIRECTED]->(m);
+
+MATCH (p:Person)-[:ACTED_IN]->()
+WITH DISTINCT p SET p:Actor;
+
+MATCH (p:Person)-[:DIRECTED]->()
+WITH DISTINCT p SET p:Director;
+```
+
+We can run this query at any point to refresh the database with the latest data. A single process to build our graph provides a consistent mechanism to test our import.
+
+### Transactions
+Importing significant volumes of data in a single transaction can result in large write operations - this can cause performance issues and potential failure.
+
+We can split a query into multiple transactions using the `CALL` clause with `IN TRANSACTIONS`:
+```sql
+CALL {
+  // our query here
+} IN TRANSACTIONS [OF X ROWS]
+```
+For example, we can create the `Person` nodes in each individual transaction of 100 rows:
+```sql
+:auto
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/persons.csv' AS row
+CALL (row) {
+    MERGE (p:Person {tmdbId: toInteger(row.person_tmdbId)})
+    SET
+        p.imdbId = toInteger(row.person_imdbId),
+        p.bornIn = row.bornIn,
+        p.name = row.name,
+        p.bio = row.bio,
+        p.poster = row.person_poster,
+        p.url = row.person_url,
+        p.born = date(row.born),
+        p.died = date(row.died)
+} IN TRANSACTIONS OF 100 ROWS
+```
+This will create `Person` nodes in batches of 100 rows at each transaction.
+
+The `:auto` browser command executes the query in **auto-committing transactions**. This means that each transaction is committed automatically after the query is executed. This is useful for large queries that may take a long time to run, as it allows the database to commit the changes in smaller batches rather than waiting for the entire query to finish. This can help reduce the risk of running out of memory or causing other performance issues.
+
+
+### Multiple passes
+If we have a csv file `books.csv` with the following data:
+```csv
+id,title,author,publication_year,genre,rating,still_in_print,last_purchased
+19515,The Heights,Anne Conrad,2012,Comedy,5,true,2023/4/12 8:17:00
+39913,Starship Ghost,Michael Tyler,1985,Science Fiction|Horror,4.2,false,2022/01/16 17:15:56
+60980,The Death Proxy,Tim Brown,2002,Horror,2.1,true,2023/11/26 8:34:26
+18793,Chocolate Timeline,Mary R. Robb,1924,Romance,3.5,false,2022/9/17 14:23:45
+67162,Stories of Three,Eleanor Link,2022,Romance|Comedy,2,true,2023/03/12 16:01:23
+25987,Route Down Below,Tim Brown,2006,Horror,4.1,true,2023/09/24 15:34:18
+```
+We could import the data using
+```sql
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/books.csv' AS row
+MERGE (b:Book {id: row.id})
+SET b.title = row.title
+MERGE (a:Author {name: row.author})
+MERGE (a)-[:WROTE]->(b)
+```
+This will create `Book` and `Author` nodes, and create a `WROTE` relationship between them.
+
+Queries with multiple operations chained together have the potential to write data and then read data that is out of sync- which can result in an **Eager** operator. The Eager operator will cause any operations to execute in their entirety before continuing, ensuring isolation between the different parts of the query. When importing data the Eager operator can cause high memory usage and performance issues.
+
+A better approach to avoid the Eager operator is to break the import into smaller parts. By taking multiple passes over the data file, the query also becomes simpler to understand and change to fit the data model.
+
+In the example above, the import could be broken into three parts:
+- Create the `Book` nodes
+- Create the `Author` nodes
+- Create the `WROTE` relationships
+
+So we could run the following queries:
+```sql
+// Create "Book" nodes
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/books.csv' AS row
+MERGE (b:Book {id: row.id})
+SET b.title = row.title;
+
+// Create "Author" nodes
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/books.csv' AS row
+MERGE (a:Author {name: row.author});
+
+// Create "WROTE" relationships
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing-cypher/books.csv' AS row
+MATCH (a:Author {name: row.author})
+MATCH (b:Book {id: row.id})
+MERGE (a)-[:WROTE]->(b);
+```

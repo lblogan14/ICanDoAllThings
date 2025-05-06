@@ -249,3 +249,242 @@ RETURN m.title
 Here we want to exclude the `DIRECTED` relationship to moveis for Tom Hanks.
 
 ### Multiple MATCH Clauses
+```sql
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE m.year > 2000
+MATCH (m)<-[:DIRECTED]-(d:Person)
+RETURN a.name, m.title, d.name
+```
+This query
+- Retrieves the anchor nodes (movies released after 2000) and the set of actors for each movie.
+- Then follows the `DIRECTED` relationship to each `Movie` node to retrieve the director of each movie.
+- Returns the tuple of actor name, movie title, and director name.
+
+There are repeated rows in the result set because the same actor may have acted in multiple movies, and the same movie may have multiple actors. An alternative to using multiple `MATCH` clauses is to specify multiple patterns:
+```sql
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie),
+      (m)<-[:DIRECTED]-(d:Person)
+WHERE m.year > 2000
+RETURN a.name, m.title, d.name
+```
+In this query, multiple patterns are specified. In the second pattern, the variable `m` is used from the first pattern. In general, using a single `MATCH` clause will perform better than multiple `MATCH` clauses, because relationship uniqueness is enforced so there are fewer relationships traversed.
+
+We can also write the same query as follows:
+```sql
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie)<-[:DIRECTED]-(d:Person)
+WHERE m.year > 2000
+RETURN a.name, m.title, d.name
+```
+
+Cypher has a clause that allows us to return rows that contain null values for some properties. For example,
+```sql
+MATCH (m:Movie) 
+WHERE m.title = "Kiss Me Deadly"
+MATCH (m)-[:IN_GENRE]->(g:Genre)<-[:IN_GENRE]-(rec:Movie)
+MATCH (m)<-[:ACTED_IN]-(a:Actor)-[:ACTED_IN]->(rec)
+RETURN rec.title, a.name
+```
+In this query:
+- We find the movie node for "Kiss Me Deadly"
+- Then we find all movies, `rec`, that are in the same genre as "Kiss Me Deadly"
+- Then we find the actors that acted in both `rec` and "Kiss Me Deadly"
+
+What if we want to expand the result returned to return all movies that are in the same genre, and the actor that acted in both movies. We can use the `OPTIONAL MATCH` clause. The `OPTIONAL MATCH` clause will return null for missing parts of the pattern if no matches are found. For example:
+```sql
+MATCH (m:Movie)
+WHERE m.title = "Kiss Me Deadly"
+MATCH (m)-[:IN_GENRE]->(g:Genre)<-[:IN_GENRE]-(rec:Movie)
+OPTIONAL MATCH (m)<-[:ACTED_IN]-(a:Actor)-[:ACTED_IN]->(rec)
+RETURN rec.title, a.name
+```
+This query returns rows where an actor acted in both movies is optional and null value is returned for any row that has no value.
+
+
+## Controling Results Returned
+
+### Ordering results
+Whether we return results as nodes or as properties of nodes, we can specify a property value for the ordering.
+- Stirngs are ordered by their text values
+- Boolean true comes before false
+- Numeric data (including date and datetime properties) are ordered by their numeric values
+
+We specify `ORDER BY` in the `RETURN` clause where we specify the property for the ordering:
+```sql
+MATCH (p:Person)
+WHERE p.born.year = 1980
+RETURN p.name AS name,
+p.born AS birthDate,
+ORDER BY p.born
+```
+This query fins all `Person` nodes with a born year of 1980. The born property of `Person` nodes is a Cypher date type, so we can use the year method to test the year value. The default ordering is ascending, but we can specify `DESC` for descending order:
+```sql
+MATCH (p:Person)
+WHERE p.born.year = 1980
+RETURN p.name AS name,
+p.born AS birthDate
+ORDER BY p.born DESC
+```
+
+We may not want to return null values when we order the results, so it is a good practice to use the `WHERE` clause to filter out null values before ordering:
+```sql
+MATCH (p:Person)
+WHERE p.born IS NOT NULL
+RETURN p.name AS name, p.born AS birthDate
+ORDER BY p.born DESC
+```
+
+We can also provide multiple sort expressions and the result will be sorted in that order:
+```sql
+MATCH (p:Person)-[:DIRECTED | ACTED_IN]->(m:Movie)
+WHERE p.name = "Tom Hanks"
+OR p.name = "Keanu Reeves"
+RETURN m.year, m.title
+ORDER BY m.year DESC, m.title
+```
+This query returns the movie in descending year order and then the movie title in ascending order. The `|` operator is used to specify multiple relationship types in the pattern.
+
+
+### Limiting or counting results returned
+Although we can filter queries to reduce the number of results returned, we may also want to limit the number of results returned. We can use the `LIMIT` clause to limit the number of rows returned:
+```sql
+MATCH (m:Movie)
+WHERE m.released IS NOT NULL
+RETURN m.title AS title,
+m.released AS releaseDate
+ORDER BY m.released DESC LIMIT 100
+```
+This query returns the first 100 movies in descending order of release date.
+
+We may want to determine the youngest person in the graph:
+```sql
+MATCH (p:Person)
+WHERE p.born IS NOT NULL
+RETURN p.name AS name,
+p.born AS birthDate
+ORDER BY p.born DESC LIMIT 1
+```
+
+In an ordered result set, we may want to control what results are returned. For example, we can return the names of people born in 1980 ordered by their birth date:
+```sql
+MATCH (p:Person)
+WHERE p.born.year = 1980
+RETURN p.name AS name,
+p.born AS birthDate
+ORDER BY p.born
+```
+Then we can add a `SKIP` and `LIMIT` keywords to control what page of results are returned:
+```sql
+MATCH (p:Person)
+WHERE p.born.year = 1980
+RETURN p.name AS name,
+p.born AS birthDate
+ORDER BY p.born SKIP 40 LIMIT 10
+```
+This query returns 10 rows starting at the 41st row.
+
+If we want to eliminate duplicates from the result set, we can use the `DISTINCT` keyword:
+```sql
+MATCH (p:Person)-[:DIRECTED | ACTED_IN]->(m:Movie)
+WHERE p.name = "Tom Hanks"
+RETURN DISTINCT m.title, m.released
+ORDER BY m.title
+```
+
+We can use `DISTINCT` to eliminate duplications of 
+- rows returned 
+- property values
+- nodes
+
+For example, we can eliminate duplicate property values:
+```sql
+MATCH (m:Movie)
+RETURN DISTINCT m.year
+ORDER BY m.year
+```
+This query return only the distinct years for movies in the graph. We can also eliminate duplicate nodes:
+```sql
+MATCH (p:Person)-[:DIRECTED | ACTED_IN]->(m:Movie)
+WHERE p.name = "Tom Hanks"
+RETURN DISTINCT m
+```
+This query returns the distinct `Movie` nodes that Tom Hanks acted in or directed. 
+
+
+### Map projections to return data
+The data is returned as rows of data where each row represents a JSON-style object for a node. For example,
+```sql
+MATCH (p:Person)
+WHERE p.name CONTAINS "Thomas"
+RETURN p AS person
+ORDER BY p.name ASC
+```
+This query returns all `Person` nodes that contain the string "Thomas". We can also return the data without the internal node information, that is, only property values:
+```sql
+MATCH (p:Person)
+WHERE p.name CONTAINS "Thomas"
+RETURN p {.* } AS person
+ORDER BY p.name ASC
+```
+This query returns an object named person that contains all of the property values for the node. It does not contain any of the internal node information such as its labels or id. The `.*` syntax is used to return all properties for the node.
+
+```sql
+MATCH (p:Person)
+WHERE p.name CONTAINS "Thomas"
+RETURN p { .name, .born } AS person
+ORDER BY p.name ASC
+```
+This query returns person objects that only contain the `name` and `born` properties.
+
+We can also add information to the objects returned that are not part of the data in the graph:
+```sql
+MATCH (m:Movie)<-[:DIRECTED]-(d:Director)
+WHERE d.name = "Woody Allen"
+RETURN m {.*, favorite: true} AS movie
+```
+In addition to returning all properties for the `Movie` node for each movie directed by Woody Allen, we also return a property named `favorite` with a value of `true` for each movie.
+
+### Changing results returned
+We can always change the data that is returned by performing string or numeric operations on the data. For example,
+```sql
+MATCH (m:Movie)<-[:DIRECTED]-(p:Person)
+WHERE m.title CONTAINS "Toy Story"
+AND p.died IS NULL
+RETURN m.title AS movie,
+p.name AS actor,
+p.born AS dob,
+date().year - p.born.year AS AgeThisYear
+```
+This query returns the actors in each Toy Story movie and their age if they are still alive according to our current graph. We add data to each line by calculating the actor's age by subtracting the year of birth from the current year. The `date()` function returns the current date and time, and the `year` method returns the year value.
+
+We can also concatenate string data returned:
+```sql
+MATCH (m:Movie)<-[:ACTED_IN]-(p:Person)
+WHERE m.title CONTAINS "Toy Story"
+AND p.died IS NULL
+RETURN "Movie: " + m.title AS movie,
+p.name AS actor,
+p.born AS dob,
+date().year - p.born.year AS AgeThisYear
+```
+
+Cypher also has a `CASE` clause that we can specify to compute the data returned which may be different from what is in the graph. For example,
+```sql
+MATCH (m:Movie)<-[:ACTED_IN]-(p:Person)
+WHERE p.name = "Henry Fonda"
+RETURN m.title AS movie,
+CASE
+    WHEN m.year < 1940 THEN "oldies"
+    WHEN 1940 <= m.year < 1950 THEN "forties"
+    WHEN 1950 <= m.year < 1960 THEN "fifties"
+    WHEN 1960 <= m.year < 1970 THEN "sixties"
+    WHEN 1970 <= m.year < 1980 THEN "seventies"
+    WHEN 1980 <= m.year < 1990 THEN "eighties"
+    WHEN 1990 <= m.year < 2000 THEN "nineties"
+    ELSE "two-thousands"
+END
+AS timeFrame
+```
+In this query, we transform the data returned to reflect the timeframe for the movie. The `CASE` clause is used to specify the different timeframes for the movie. The `ELSE` clause is used to specify a default value if none of the other conditions are met.
+
+
+## Working with Cypher Data

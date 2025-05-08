@@ -488,3 +488,381 @@ In this query, we transform the data returned to reflect the timeframe for the m
 
 
 ## Working with Cypher Data
+
+### Aggregating data
+
+#### Using `count()` to aggregate data
+Cypher has a `count()` function that we can use to perform a count of nodes, relationships, path, rows during query processing.
+```sql
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie)
+WHERE a.name = "Tom Hanks"
+RETURN a.name AS actorName,
+count(*) AS numMovies
+```
+This query returns the number of movies that Tom Hanks acted in. The `*` wildcard is necessary to count all rows returned.
+```sql
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie)<-[:DIRECTED]-(d:Person)
+RETURN a.name AS actorName,
+d.name AS directorName,
+count(*) AS numMovies
+ORDER BY numMovies DESC
+```
+In this query, actors and directors worked together in the same movie and the number of movies is counted. The `ORDER BY` clause is used to order the results by the number of movies in descending order.
+
+When we aggregate in a Cypher statement, the query must process al patterns in the `MATCH` clause to complete the aggregation to return results. This is called *eager aggregation*.
+```sql
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie)<-[:DIRECTED]-(d:Person)
+WHERE a.name, d.name,
+count(*) AS numMovies
+ORDER BY numMovies DESC
+```
+This query processes all nodes and relationships in the pattern so that it can perform a count of all movies for a particular actor-director pair in the graph.
+
+If we specify `count(n)`, the graph engine calculates the number of non-null occurrences of *n*. If we specify `count(*)`, the graph engine calculates the number of rows retrieved, including those with null values.
+
+
+#### Returning a list
+In our example Movie dataset, we know that the `languages` and `countries` properties are lists:
+```sql
+MATCH (m:Movie)
+RETURN m.languages AS languages,
+m.countries AS countries
+```
+We can also return a list by specifying the square brackets `[]`:
+```sql
+MATCH (p:Person)
+RETURN p.name, [p.born, p.died] AS lifeTime
+LIMIT 10
+```
+
+#### Using `collect()` to create a list
+Cypher has a built-in aggregation function called `collect()` that enables us to aggregate values into a list. The value can be any expression, for example a property value, a node, or result of a function or operations.
+```sql
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie)
+RETURN a.name AS actor,
+count(*) AS total,
+collect(m.title) AS movies
+ORDER BY total DESC LIMIT 10
+```
+This query returns a list of movies titles associated with each actor.
+
+#### Eliminating duplicates in lists
+Just like we can use `DISTINCT` to eliminate duplicates in the result set, we can also use `DISTINCT` with `collect()` to eliminate duplicates in the list:
+```sql
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie)
+WHERE m.year = 1920
+RETURN collect(m.title) AS movies,
+collect(a.name) AS actors
+```
+We notice that there are duplicate titles in the Movie list. We can use `DISTINCT` to eliminate duplicates:
+```sql
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie)
+WHERE m.year = 1920
+RETURN collect(DISTINCT m.title) AS movies,
+collect(a.name) AS actors
+```
+
+#### Collecting nodes
+Rather than collecting the values of the *title* properties for movies, we can collect the nodes.
+```sql
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.name = "Tom Cruise"
+RETURN collect(m) AS tomCruiseMovies
+```
+This query returns a list of all `Movie` nodes for Tom Cruise. If replace `RETURN collect(m) AS tomCruiseMovies` with `RETURN m AS tomCruiseMovies`, the returned data is no longer a list in table view.
+
+#### Accessing elements of a list
+We can access elements of the list using the `[index-value]` notation. For example, we can return the first cast member for each movie:
+```sql
+MATCH (m:Movie)<-[:ACTED_IN]-(a:Person)
+RETURN m.title AS movie,
+collect(a.name)[0] AS castMember,
+size(collect(a.name)) AS castSize
+```
+
+We can also return a slice of a collection:
+```sql
+MATCH (m:Movie)<-[:ACTED_IN]-(a:Person)
+RETURN m.title AS movie,
+collect(a.name)[2..] AS castMembers,
+size(collect(a.name)) AS castSize
+```
+This query returns the second to the end of the list names of actors. Other aggregating functions include `min()`, `max()`, `avg()`, and `sum()`.
+
+#### Using `count()` versus `size()`
+We can either use `count()` to count the number of rows, or alternatively, we can return the size of the collected results. The `size()` function returns the number of elements in a list:
+```sql
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie)<-[:DIRECTED]-(d:Person)
+RETURN a.name, d.name,
+size(collect(m)) AS collaborations,
+collect(m.title) AS movies
+```
+
+`count()` may be more efficient than `size()` because it gets its values for node counts or relationships from a node from the internal count store of the graph.
+
+#### List comprehension
+We can create a list by evaluating an expression that tests for list inclusion:
+```sql
+MATCH (m:Movie)
+RETURN m.title AS movie,
+[x IN m.countries WHERE x CONTAINS "USA" OR x CONTAINS "German"]
+AS countries LIMIT 500
+```
+
+#### Pattern comprehension
+we can also use pattern comprehension to create lists without changing the cardinality of the query:
+```sql
+MATCH (m:Movie)
+WHERE m.year = 2015
+RETURN m.title,
+[(dir:Person)-[:DIRECTED]->(m) | dir.name] AS directors,
+[(act:Person)-[:ACTED_IN]->(m) | act.name] AS actors
+```
+For pattern comprehension, we specify the list with the square braces to include the pattern followed by the pipe `|` to specify what values will be placed in the list from the pattern.
+
+We can also use pattern comprehension to create a list where we specify a filter for the pattern:
+```sql
+MATCH (a:Person {name: "Tom Hanks"})
+RETURN [
+    (a)-->(b:Movie)
+    WHERE b.title CONTAINS "Toy" | b.title + ": " + b.year
+]
+AS movies
+```
+For this pattern comprehension, the title of the movie is concatenated with the year of the movie as a value to add as an element of the list returned.
+
+#### Working with maps
+A Cypher `map` is list of key/value pairs where each element of the list is of the format `key: value`. A node or relationship can have a property that is a map.
+
+For example, a map of months and the number of days per month could be:
+```
+{Jan: 31, Feb: 28, Mar: 31, Apr: 30 , May: 31, Jun: 30 , Jul: 31, Aug: 31, Sep: 30, Oct: 31, Nov: 30, Dec: 31}
+```
+
+Using this map, we can return the value for one of its elements:
+```sql
+RETURN {Jan: 31, Feb: 28, Mar: 31, Apr: 30 , May: 31, Jun: 30 , Jul: 31, Aug: 31, Sep: 30, Oct: 31, Nov: 30, Dec: 31}["Feb"] AS daysInFeb
+```
+Alternatively, we can access a value with the `.` operator:
+```sql
+RETURN {Jan: 31, Feb: 28, Mar: 31, Apr: 30 , May: 31, Jun: 30 , Jul: 31, Aug: 31, Sep: 30, Oct: 31, Nov: 30, Dec: 31}.Feb AS daysInFeb
+```
+We can also use the `keys()` function to return the keys of a map:
+```sql
+RETURN keys({Jan: 31, Feb: 28, Mar: 31, Apr: 30 , May: 31, Jun: 30 , Jul: 31, Aug: 31, Sep: 30, Oct: 31, Nov: 30, Dec: 31}) AS months
+```
+
+#### Map projections
+Map projections are when we can use retrieved nodes to create or return some of the information in the nodes. A `Movie` node can have the properties `title`, `released`, and `tagline`. Suppose we want to return the `Movie` node information, but without the `tagline` properry:
+```sql
+MATCH (m:Movie)
+WHERE m.title CONTAINS "Matrix"
+RETURN m { .title, .released } AS movie
+```
+
+### Working with Dates and Times
+Cypher has basic formats for storing date and time data:
+```sql
+RETURN date(), datetime(), time()
+```
+For example,
+MERGE (x:Test {id: 1})
+SET x.date = date(),
+x.datetime = datetime(),
+x.time = time()
+RETURN x
+```
+This query creates a node with the label `Test` and sets the properties `date`, `datetime`, and `time` to the current date, datetime, and time.
+
+We can access the components of a date or datetime property:
+```sql
+MATCH (x:Test {id: 1})
+RETURN x.date.day, x.date.year,
+x.datetime.year, x.datetime.hour,
+x.datetime.minute
+```
+
+We can use a string to set a value for a date:
+```sql
+MATCH (x:Test {id: 1})
+SET x.date1 = date("2022-01-01"),
+x.date2 = date("2025-01-05")
+RETURN x
+```
+
+We can also use a string to set a value for a datetime:
+```sql
+MATCH (x:Test {id: 1})
+SET x.datetime1 = datetime("2022-01-01T12:00:00"),
+x.datetime2 = datetime("2025-01-05T15:33:01")
+RETURN x
+```
+
+A duration is used to determine the difference between two date/datetime values or to add or subtract a duration to a value. For example, we can use the `duration` to find the difference between two date values:
+```sql
+MATCH (x:Test {id: 1})
+RETURN duration.between(x.date1, x.date2)
+```
+This query returns the duration that represents the days and months and times between the two dates. We can also return the duration in days between two datetime values:
+```sql
+MATCH (x:Test {id: 1})
+RETURN duration.inDays(x.datetime1, x.datetime2).days
+```
+
+We can add a duration of 6 months:
+```sql
+MATCH (x:Test {id: 1})
+RETURN x.date1 + duration({months: 6})
+```
+
+We can use the APOClibrary to format a datetime:
+```sql
+MATCH (x:Test {id: 1})
+RETURN x.datetime, as Datetime,
+apoc.temporal.format(x.datetime, "HH:mm:ss.SSSS")
+AS formattedDatetime
+```
+
+## Graph Traversal
+When the execution plan is created, it determines the set of nodes that will be the starting points for the query.
+
+The anchor for a query is based upon a `MATCH` clause. The anchor is determined by metadata that is stored in the graph or a filter that is provided inline or in a `WHERE` clause. The anchor for a query will be based upon the fewest number of nodes that need to be retrieved into memory.
+
+```sql
+PROFILE MATCH (p:Person)-[:ACTED_IN]->(m)
+RETURN p.name, m.title LIMIT 100
+```
+In this query, the `Person` nodes are the anchor for the query, because they have fewer number of nodes that need to be retrieved than the total number of nodes in the graph which is what `m` represents.
+
+```sql
+PROFILE MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+RETURN p.name, m.title LIMIT 100
+```
+In this query, the `Movie` nodes are the anchor for the query, because they have fewer number of nodes than the `Person` nodes.
+
+```sql
+PROFILE MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.name = "Eminem"
+RETURN p.name, m.title
+```
+In this query, a filter is specified to reduce the number of nodes retrieved for the `Person` nodes. Satisfying the filter is the anchor for the query.
+
+By default, an anchor set of nodes is determined by the metadata related to the query path and `WHERE` clauses to filter the query.
+```sql
+PROFILE
+MATCH (p1:Person)-[:ACTED_IN]->(m1)
+MATCH (m2)<-[:ACTED_IN]-(p2:Person)
+WHERE p1.name = "Tom Hanks"
+AND p2.name = "Meg Ryan"
+AND m1 = m2
+RETURN m1.title
+```
+In this query, all `p1` nodes are retrieved as well as all `p2` nodes. This query has two sets of anchor nodes. It retrieves the anchor nodes before the equality filter is applied.
+
+After the anchor nodes have been retrieved, the next step is to follow the path in the query.The goal is to eliminate paths from the nodes in memory to nodes that will need to be retrieved. This is where specifying the relationship type is important.
+```sql
+PROFILE MATCH (m:Movie)<--(p:Person)
+WHERE p.name = "Clint Eastwood"
+RETURN m.title
+```
+```sql
+PROFILE MATCH (m:Movie)<-[:DIRECTED]-(p:Person)
+WHERE p.name = "Clint Eastwood"
+RETURN m.title
+```
+The second query is more efficient because it specifies the relationship type `DIRECTED` which reduces the number of nodes that need to be retrieved.
+
+
+#### Basic query traversal
+```sql
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.name = "Eminem"
+RETURN m.title AS movies
+```
+When this query executes,
+1. The `"Eminem"` `Person` node is retrieved.
+2. Then the first `ACTED_IN` relationship is traversed to retrieve the `Movie` node for "8 Mile".
+3. Then the second `ACTED_IN` relationship is traversed to retrieve the next `Movie` node for "Hip Hop Witch, Da".
+4. The `title` property is retrieved and returned.
+
+Another graph optimization we can take advantage of is to reduce labels used in our query patterns. Having a label for the anchor nodes in a pattern is good:
+```sql
+PROFILE MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.name = "Eminem"
+RETURN m.title AS movies
+```
+We can have a more performant query by removing the label from the `Movie` node:
+```sql
+PROFILE MATCH (p:Person)-[:ACTED_IN]->(m)
+WHERE p.name = "Eminem"
+RETURN m.title AS movies
+```
+
+When we return nodes, by default the relationships are visualized:
+```sql
+MATCH (p:Person)-[]->(m)
+WHERE p.name = "Eminem"
+RETURN p, m
+```
+The visualization includes one `Person` node that is connected to four `Movie` nodes using five relationships. We can return paths in our query:
+```sql
+MATCH p = ((person:Person)-[]->(movie))
+WHERE person.name = "Eminem"
+RETURN p
+```
+This query return 5 paths. We can use those paths and analyze:
+- `length(p)` to return the length of the path
+- `nodes(p)` to return a list containing the nodes in the path
+- `relationships(p)` to return a list containing the relationships in the path
+
+
+### Varying length traversal
+Any graph that represents social networking, hierarchies, transport, flow, or dependency networks will most likely have multiple paths of varying lengths. Use cases for this type of traversal:
+- Finding the shortest path between two nodes
+- Finding out how "close" nodes are to each other in the graph
+
+#### Shortest path
+Cypher has a built-in function that returns the shortest path between any two nodes, if one exists:
+```sql
+MATCH p = shortestPath( (p1:Person)-[*]-(p2:Person) )
+WHERE p1.name = "Eminem"
+AND p2.name = "Charlton Heston"
+RETURN p
+```
+This query calculates and returns the shortest path between the Eminem node and the Charlton Heston node in the graph. Because nothing is specified for the relationship type, it finds the shortest path regardless of the relationship type. 
+
+<img src="imgs/em-ch-shortestpath.PNG" alt="Shortest Path" width="30%"/>
+
+We can also limit the relationship types:
+```sql
+MATCH p = shortestPath( (p1:Person)-[:ACTED_IN*]->(p2:Person) )
+WHERE p1.name = "Eminem"
+AND p2.name = "Charlton Heston"
+RETURN p
+```
+This query returns a longer path because the relationship must be `ACTED_IN`:
+
+<img src="imgs/em-ch-shortestpath-actin.PNG" alt="Shortest Path Acted In" width="50%"/>
+
+#### Varying length
+Suppose we want to retrieve all `Person` nodes that are exactly *two hops* away from Eminem using the `ACTED_IN` relationship:
+```sql
+MATCH (p:Person {name: "Eminem"})-[:ACTED_IN*2]-(others:Person)
+RETURN others.name
+```
+
+We can also do *four hops* away:
+```sql
+MATCH (p:Person {name: "Eminem"})-[:ACTED_IN*4]-(others:Person)
+RETURN others.name
+```
+
+We can also retrieve all `Person` nodes that are *up to four hops* away from Eminem:
+```sql
+MATCH (p:Person {name: "Eminem"})-[:ACTED_IN*1..4]-(others:Person)
+RETURN others.name
+```
+The `*1..4` syntax is used to specify the range of hops. This depth-first traversal and retrieval continues until all Person nodes that are two hops away and four hops away are retrieved.
+
+
+## Pipelining Queries

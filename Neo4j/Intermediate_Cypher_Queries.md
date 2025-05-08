@@ -302,7 +302,7 @@ This query returns rows where an actor acted in both movies is optional and null
 
 ## Controling Results Returned
 
-### Ordering results
+### Ordering Results
 Whether we return results as nodes or as properties of nodes, we can specify a property value for the ordering.
 - Stirngs are ordered by their text values
 - Boolean true comes before false
@@ -344,7 +344,7 @@ ORDER BY m.year DESC, m.title
 This query returns the movie in descending year order and then the movie title in ascending order. The `|` operator is used to specify multiple relationship types in the pattern.
 
 
-### Limiting or counting results returned
+### Limiting or Counting Results Returned
 Although we can filter queries to reduce the number of results returned, we may also want to limit the number of results returned. We can use the `LIMIT` clause to limit the number of rows returned:
 ```sql
 MATCH (m:Movie)
@@ -410,7 +410,7 @@ RETURN DISTINCT m
 This query returns the distinct `Movie` nodes that Tom Hanks acted in or directed. 
 
 
-### Map projections to return data
+### Map Projections to Return Data
 The data is returned as rows of data where each row represents a JSON-style object for a node. For example,
 ```sql
 MATCH (p:Person)
@@ -443,7 +443,7 @@ RETURN m {.*, favorite: true} AS movie
 ```
 In addition to returning all properties for the `Movie` node for each movie directed by Woody Allen, we also return a property named `favorite` with a value of `true` for each movie.
 
-### Changing results returned
+### Changing Results Returned
 We can always change the data that is returned by performing string or numeric operations on the data. For example,
 ```sql
 MATCH (m:Movie)<-[:DIRECTED]-(p:Person)
@@ -489,7 +489,7 @@ In this query, we transform the data returned to reflect the timeframe for the m
 
 ## Working with Cypher Data
 
-### Aggregating data
+### Aggregating Data
 
 #### Using `count()` to aggregate data
 Cypher has a `count()` function that we can use to perform a count of nodes, relationships, path, rows during query processing.
@@ -816,7 +816,7 @@ This query return 5 paths. We can use those paths and analyze:
 - `relationships(p)` to return a list containing the relationships in the path
 
 
-### Varying length traversal
+### Varying Length Traversal
 Any graph that represents social networking, hierarchies, transport, flow, or dependency networks will most likely have multiple paths of varying lengths. Use cases for this type of traversal:
 - Finding the shortest path between two nodes
 - Finding out how "close" nodes are to each other in the graph
@@ -866,3 +866,357 @@ The `*1..4` syntax is used to specify the range of hops. This depth-first traver
 
 
 ## Pipelining Queries
+
+### Scoping Variables
+```sql
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.name = "Tom Hanks"
+RETURN m.title AS movies
+```
+In this query, the variable `p` is used to test each `Person` node against the value "Tom Hanks". The variable `m` is used to return the movie titles. We can define and initialize variables with a `WITH` clause:
+```sql
+WITH "Tom Hanks" AS actorName
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.name = actorName
+RETURN m.title AS movies
+```
+
+```sql
+WITH "Toy Story" AS mt, "Tom Hanks" AS actorName
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.name = actorName
+AND toLower(m.title) CONTAINS mt
+RETURN m.title AS movies
+```
+In this query, `mt` and `actorName` are within scope of the `MATCH` clause that also uses the `WHERE` clause.
+
+```sql
+WITH "Toy Story" AS mt, "Tom Hanks" AS actorName
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WITH m, toLower(m.title) AS movieTitle
+WHERE p.name = actorName
+AND movieTitle CONTAINS mt
+RETURN m.title AS movies, movieTitle
+```
+In this query, the `mt` and `actorName` variables are available to the `MATCH` and `WHERE` clauses just like the previous query. However, we must add the `m` to the second `WITH` so that the node can be used to return the title of the node.
+
+A `WITH` clause is used to define or redefine the scope of variables. Because we want to redefine what is used for the `WHERE` clause, we add a new `WITH` clause. This creates a new scope for the remainder of the query so that `m` and `movieTitle` can be used to return values.
+
+Suppose we have a query that returns only two rows:
+```sql
+WITH "Tom Hanks" AS theActor
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.name = theActor
+RETURN m.title AS movies LIMIT 2
+```
+Another way to write:
+```sql
+WITH "Tom Hanks" AS theActor
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.name = theActor
+WITH m LIMIT 2
+RETURN m.title AS movies
+```
+
+If we limit the nodes to process further in the query or for the `RETURN` clause, we can also order them:
+```sql
+WITH "Tom Hanks" AS theActor
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.name = theActor
+WITH m ORDER BY m.year LIMIT 5
+RETURN m.title AS movies, m.year AS yearReleased
+```
+
+Using a map projection, we can specify which properties are returned:
+```sql
+MATCH (n:Movie)
+WHERE n.imdbRating IS NOT NULL
+AND n.poster IS NOT NULL
+
+WITH n {
+    .title,
+    .year,
+    .languages,
+    .plot,
+    .poster,
+    .imdbRating,
+    directors: [ (n)<-[:DIRECTED]-(d) | d { tmdbId:i.imdbId, .name } ]
+}
+ORDER BY n.imdbRating DESC LIMIT 4
+RETURN collect(n)
+```
+This query returns a subset of the data in a `Movie` node. It returns the top four rated movies.
+
+
+### Pipelining Queries
+We knew that we can use `WITH` clause to redefine the scope for a query. We can also further process the returned data with another `MATCH` clause. For example:
+```sql
+WITH "Tom Hanks" AS theActor
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.name = theActor
+WITH m LIMIT 5
+MATCH (d:Person)-[:DIRECTED]->(m)
+RETURN d.name AS director,
+m.title AS movies
+```
+The five Movie nodes are used for the second `MATCH` clause and five rows are returned. The `WITH` clause enables us to pipeline the results of the first query into the second query.
+
+#### Using `WITH` for aggregation
+```sql
+MATCH (:Movie {title: 'Toy Story'})-[:IN_GENRE]->(g:Genre)<-[:IN_GENRE]-(m)
+WHERE m.imdbRating IS NOT NULL
+WITH g.name AS genre,
+count(m) AS moviesInCommon,
+sum(m.imdbRating) AS total
+RETURN genre, moviesInCommon,
+total/moviesInCommon AS score
+ORDER By score DESC
+```
+In this query we are counting the number of movies that share the same `Genre` node.
+
+```sql
+MATCH (u:User {name: "Misty Williams"})-[r:RATED]->(:Movie)
+WITH u, avg(r.rating) AS average
+MATCH (u)-[r:RATED]->(m:Movie)
+WHERE r.rating > average
+RETURN average , m.title AS movie,
+r.rating as rating
+ORDER BY rating DESC
+```
+In this query, we first calculate the average rating for all movies that Misty Williams rated, and then we use this calculated value as a test for the second `MATCH` clause.
+
+#### Using `WITH` for collecting
+
+```sql
+MATCH (m:Movie)--(a:Actor)
+WHERE m.title CONTAINS "New York"
+WITH m, collect (a.name) AS actors,
+count(*) AS numActors
+RETURN m.title AS movieTitle, actors
+ORDER BY numActors DESC
+```
+This query collects the names of actors that acted in movies containing the string "New York".
+
+```sql
+MATCH (m:Movie)<-[:ACTED_IN]-(a:Actor)
+WHERE m.title CONTAINS 'New York'
+WITH m, collect (a.name) AS actors,
+count(*) AS numActors
+ORDER BY numActors DESC
+RETURN collect(m { .title, actors, numActors }) AS movies
+```
+This query performs a 2-step aggregation for collecting a list of maps.
+
+
+#### Using `LIMIT` early
+A best practice is to execute queries that minimize the number of rows processed in the query. One way to do that is to limit early in the query. For example:
+```sql
+PROFILE MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.born.year = 1980
+WITH p,
+collect(m.title) AS movies LIMIT 3
+RETURN p.name AS actor, movies
+```
+A better way to do this query is to limit early:
+```sql
+PROFILE MATCH (p:Actor)
+WHERE p.born.year = 1980
+WITH p  LIMIT 3
+MATCH (p)-[:ACTED_IN]->(m:Movie)
+WITH p, collect(m.title) AS movies
+RETURN p.name AS actor,  movies
+```
+
+
+#### Using `DISTINCT` when necessary
+
+```sql
+MATCH (p:Actor)
+WHERE p.born.year = 1980
+WITH p  LIMIT 3
+MATCH (p)-[:ACTED_IN]->(m:Movie)-[:IN_GENRE]->(g:Genre)
+WITH p, collect(g.name) AS genres
+RETURN p.name AS actor, genres
+```
+For this query, the collected genre names are repeated. We want to ensure that they are not duplicated:
+```sql
+MATCH (p:Actor)
+WHERE p.born.year = 1980
+WITH p  LIMIT 3
+MATCH (p)-[:ACTED_IN]->(m:Movie)-[:IN_GENRE]->(g:Genre)
+WITH p, collect(DISTINCT g.name) AS genres
+RETURN p.name AS actor, genres
+```
+
+
+
+### Unwinding Lists
+In a query, we can create lists of nodes, strings, or numbers using `collect()`. Sometimes it is useful to collect elements as intermediate results that are passed on to a later part of a query.
+
+`UNWIND` returns a row for each element of a list.
+```sql
+MATCH (m:Movie)-[:ACTED_IN]-(a:Actor)
+WHERE a.name = 'Tom Hanks'
+UNWIND m.languages AS lang
+RETURN m.title AS movie,
+m.languages AS languages,
+lang AS language
+```
+In this query,
+1. A `Movie` node is retrieved that Tom Hanks acted in.
+2. The `languages` property, which is a list, is *unwound* and each value is referenced as `lang`.
+3. The rows returned will be the movie title and the `languages` property repeated for multiple rows and the `lang` value for each row.
+
+```sql
+MATCH (m:Movie)
+UNWIND m.languages AS lang
+WITH m, trim(lang) AS language
+
+WITH language, collect(m.title) AS movies
+RETURN language, movies[0..10]
+```
+This query:
+1. Retrieves all `Movie` nodes in the graph.
+2. For each `Movie` node, it unwinds the `languages` property to create a list called `lang`. Notice that we use the `trim()` function to ensure there are no extraenous whitespace characters in the language name.
+3. Then we use the element of the list to find all `Movie` nodes that use that language.
+4. Finally, we return a row that contains each language name and the list of up to 10 movie titles for that language.
+
+
+## Reducing Memory
+When we execute a series of `MATCH` clauses, all nodes and relationships retrieved are in memory. If the memory requirements for a set of `MATCH` clauses exceed the VM configured, the query will fail.
+
+A subquery is a set of Cypher statements that execute within their own scope. A subquery is typically called from an outer enclosing query.
+
+#### Performing subqueries with `CALL`
+```sql
+CALL {
+   MATCH (m:Movie) WHERE m.year = 2000
+   RETURN m ORDER BY m.imdbRating DESC LIMIT 10
+}
+MATCH  (:User)-[r:RATED]->(m)
+RETURN m.title, avg(r.rating)
+```
+The subquery is demarcated by the `{ }` brackets. In a `CALL` clause, we can specify a query that can return data from the graph or derived from the graph. A set of nodes returned in the `CALL` clause can be used by the enclosing query.
+
+
+#### Passing variables into a subquery
+```sql
+MATCH (m:Movie)
+CALL {
+    WITH m
+    MATCH (m)<-[r:RATED]-(u:User)
+     WHERE r.rating = 5
+    RETURN count(u) AS numReviews
+}
+RETURN m.title, numReviews
+ORDER BY numReviews DESC
+```
+In this query,
+1. The first `MATCH` clause returns a row for every `Movie` node called `m` in the graph.
+2. It passes the `m` variable into the subquery.
+3. Within the subquery, the query executes to find all `User` nodes that gave that movie a rating of 5 and counts them.
+4. The subquery returns the count.
+5. Back in the enclosing query, the title is returned, and the count of the number of rows returned from the subquery.
+
+
+#### Combining query results with `UNION`
+As our queries become more complex, we may want to combine the results of multiple queries. We can do this with the `UNION` clause:
+```sql
+MATCH (m:Movie) WHERE m.year = 2000
+RETURN {type:"movies", theMovies: collect(m.title)} AS data
+UNION ALL
+MATCH (a:Actor) WHERE a.born.year > 2000
+RETURN { type:"actors", theActors: collect(DISTINCT a.name)} AS data
+```
+The first query returns an object with a type property of "movies" and a theMovies property that is a list of movies. It returns this object as a variable named `data`. The second query returns an object with a type property of "actors" and a theActors property that is a list of actor names. It returns this object as a variable named `data`. Because both queries return a variable named `data`, we can combine the results using `UNION ALL`.
+
+#### Using `UNION` with subqueries
+```sql
+MATCH (p:Person)
+WITH p LIMIT 100
+CALL {
+  WITH p
+  OPTIONAL MATCH (p)-[:ACTED_IN]->(m:Movie)
+  RETURN m.title + ": " + "Actor" AS work
+UNION
+  WITH p
+  OPTIONAL MATCH (p)-[:DIRECTED]->(m:Movie)
+  RETURN m.title+ ": " +  "Director" AS work
+}
+RETURN p.name, collect(work)
+```
+This query:
+1. 100 `Person` nodes are retrieved and passed to the subquery.
+2. If that `Person` acted in the movie, its title with the Actor suffix is returned.
+3. The second part of the subquery does the same for the `DIRECTED` relationships.
+4. The work results are combined and collected.
+5. The result is the name of the person and their `Actor` or `Director` titles.
+
+
+## Using Parameters
+In Cypher, a parameter name begin with the `$` symbol.
+```sql
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.name = $actorName
+RETURN m.released AS releaseDate,
+m.title AS title
+ORDER BY m.released DESC
+```
+At runtime, if the parameter `$actorName` has a value, it will be used in the Cypher statement when it runs in the graph engine.
+
+We can set a value for a parameter in the Neo4j Browser using the `:param` command:
+```sql
+:param actorName: "Tom Hanks"
+```
+After we have set the parameter, we can then run the Cypher statement:
+```sql
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.name = $actorName
+RETURN m.released AS releaseDate,
+m.title AS title
+ORDER BY m.released DESC
+```
+
+Due to a discrepancy between integers in JaveScript and Neo4y type system, any integers are converted to floating point values when the parameter is set. This is designed to avoid any data loss on large numbers. If we run:
+```sql
+:param number: 10
+```
+The Neo4j Browser will output:
+```json
+{
+    "number": 10.0
+}
+```
+To force the number to be an integer, we can use
+```sql
+:param number=> 10
+```
+This will set the parameter to be an integer in the Neo4j Browser:
+```json
+{
+    "number": 10
+}
+```
+
+We can also use the JSON-style syntax to set multiple parameters at once:
+```sql
+:params {actorName: "Tom Hanks", movieTitle: "Toy Story"}
+```
+
+Then we can apply multiple parameters in our Cypher statement:
+```sql
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.name = $actorName
+AND m.title = $movieName
+RETURN p, m
+```
+
+To view the current parameters and their values:
+```sql
+:params
+```
+
+If we want to remove parameters:
+```sql
+:params {}
+```

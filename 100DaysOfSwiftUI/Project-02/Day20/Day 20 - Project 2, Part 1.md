@@ -4,8 +4,6 @@
 
 In this project, we will build a guessing game that helps users learn flags of the world.
 
-
-
 ## Using Stacks to Arrange Views
 
 When we return `some View` for our body, SwiftUI expects to receive back some kind of view that can be displayed on the screen. If we want to return *multiple* things neatly arranged, we can use `HStack`, `VStack`, and `ZStack`, which handle horizontal, vertical, and zepth layout.
@@ -43,8 +41,6 @@ The rendering result is the same but there are three important differences:
 
 - If we don't explicitly ask for a vertical stack, SwiftUI is free to arrange those views in a different way.
 
-
-
 By default `VStack` places automatic amount of spacing between the two views, but we can control the spacing:
 
 ```swift
@@ -56,7 +52,7 @@ VStack(spacing: 20) {
 
  In preview,
 
-<img src="./imgs/vstack-spacing.png" \>
+<img src="./imgs/vstack-spacing.png" />
 
 By default, `VStack` aligns its views at center, but we can control that with its `alignment` property,
 
@@ -69,7 +65,7 @@ VStack(alignment: .leading) {
 
 In preview,
 
-<img src="./imgs/vstack-alignment.png" \>
+<img src="./imgs/vstack-alignment.png" />
 
 Similar to `VStack`, we can use `HStack` to arrange things horizontally.
 
@@ -82,7 +78,7 @@ HStack(spacing: 30) {
 
 In preview,
 
-<img src="./imgs/hstack.png" \>
+<img src="./imgs/hstack.png" />
 
 Vertical and horizontal stacks automatically fit their content, and prefer to align themselves to the center of the available space. If we want to change, we can use `Spacer` views:
 
@@ -99,7 +95,7 @@ VStack {
 
 In preview,
 
-<img src="./imgs/spacer.png" \>
+<img src="./imgs/spacer.png" />
 
 `ZStack` is used to arrange things by depth - it makes views that overlap.
 
@@ -112,11 +108,9 @@ ZStack {
 
 In preview,
 
-<img src="./imgs/zstack.png" \>
+<img src="./imgs/zstack.png" />
 
 `ZStack` does not have the concept of spacing because the views overlap, but it *does* have alignment. `ZStack` draws its contents from top to bottom, back to front. This means if we have an image then some text `ZStack` will draw them in that order, placing the text on top of the image.
-
-
 
 ## Colors and Frames
 
@@ -131,7 +125,7 @@ ZStack {
 
 In preview,
 
-<img src="./imgs/zstack-background.png" \>
+<img src="./imgs/zstack-background.png" />
 
 This only paints a red background in the text view, even though we asked the whole `ZStack` to have it. In fact, there is no difference from the following:
 
@@ -153,13 +147,11 @@ ZStack {
 
 In preview,
 
-<img src="./imgs/zstack-whole-background.png" \>
+<img src="./imgs/zstack-whole-background.png" />
 
 `Color.red` is a view in its own right, which is why it can be used like shapes and text.
 
 When we use the `background()` modifier, SwiftUI figures out that `.red` actually means `Color.red`. When we use the color as a free-standing view Swift has no context to help it figure out what `.red` means so we need to specific that we mean `Color.red`.
-
-
 
 Colors automatically take up all the space available. We can use the `frame()` modifier to ask for specific sizes. For example, we could ask for a 200x200 red square:
 
@@ -171,10 +163,9 @@ ZStack {
 }
 ```
 
-
 In preview,
 
-<img src="./imgs/red-square.png" \>
+<img src="./imgs/red-square.png" />
 
 We can also specify minimum and maximum widths and heights:
 
@@ -186,8 +177,6 @@ ZStack {
 ```
 
 This gives a red corlor that is no more than 200 points high, but for its width must be at least 200 points width but can stretch to fill all the available width that is not used by other stuff.
-
-
 
 SwiftUI also has *semantic* colors - colors that do not say what hue they contain, but instead describe their purpose. For example, `Color.primary` is the default color of text in SwiftUI, and will either be black or white depending on whether the user's device is running in light mode or dark mode. `Color.secondary` is also black or white depending on the device, but now has slight transparency so that a little of the color behind it shines through.
 
@@ -215,13 +204,9 @@ In preview, if we set `.ignoresSafeArea()`,
 
 If not,
 
-<img src="./imgs/safe-area.png" \>
-
-
+<img src="./imgs/safe-area.png" />
 
 IMPORTANT: No important content is placed outside the safe area, because it might by hard for users to see. If our content is just decorative, then extending it outside the safe area is okay.
-
-
 
 The `background()` modifier can accept *materials*. These apply a frosted glass effect over whatever comes below them. For example,
 
@@ -242,11 +227,9 @@ ZStack {
 
 In preview,
 
-<img src="./imgs/background-materials.png" \>
+<img src="./imgs/background-materials.png" />
 
 This uses the thinnest material.
-
-
 
 ## Gradients
 
@@ -266,7 +249,7 @@ LinearGradient(colors: [.white, .black], startPoint: .top, endPoint: .bottom)
 
 In preview,
 
-<img src="./imgs/simple-linear-gradient.png" \>
+<img src="./imgs/simple-linear-gradient.png" />
 
 We can also provide with gradient stops, which let us specify both a color and how far along the gradient the color should be used.
 
@@ -283,7 +266,7 @@ LinearGradient(
 
 In preview,
 
-<img src="./imgs/gradient-stops.png" \>
+<img src="./imgs/gradient-stops.png" />
 
 This will create a much sharper gradient.
 
@@ -300,8 +283,6 @@ LinearGradient(
 )
 ```
 
-
-
 Radial gradients move outward in a circle shape.
 
 ```swift
@@ -315,9 +296,7 @@ RadialGradient(
 
 In preview,
 
-<img src="./imgs/radial-gradient.png" \>
-
-
+<img src="./imgs/radial-gradient.png" />
 
 Angular gradients cycle colors around a circle rather than radiating outward.
 
@@ -330,11 +309,9 @@ AngularGradient(
 
 In preview,
 
-<img src="./imgs/angular-gradient.png" \>
+<img src="./imgs/angular-gradient.png" />
 
 All of these gradient types can have stops provided rather than simple colors.
-
-
 
 SwiftUI also has a fourth type of gradient - we don't get any cnotrol over it, and we can use them only as backgrounds and foreground styles rather than individual views.
 
@@ -349,9 +326,7 @@ Text("Your content")
 
 In preview,
 
-<img src="./imgs/gentle-gradient.png" \>
-
-
+<img src="./imgs/gentle-gradient.png" />
 
 ## Buttons and Images
 
@@ -365,7 +340,7 @@ Button("Delete selection) {
 
 In preview,
 
-<img src="./imgs/simple-button.png" \>
+<img src="./imgs/simple-button.png" />
 
 There are a few ways to customize the button. First, we can attach a *role* to the button, which iOS can use to adjust its appearance both visually and for screen readers.
 
@@ -374,17 +349,16 @@ struct ContentView: View {
     var body: some View {
         Button("Delete selection", role: .destructive, action: executeDelete)
     }
-    
+
     func executeDelete() {
         print("Now deleting...")
     }
 }
-
 ```
 
 In preview,
 
-<img src="./imgs/button-role.png" \>
+<img src="./imgs/button-role.png" />
 
 Second, we can use one of the built-in styles for buttons: `.bordered` and `.borderedProminent`.
 
@@ -403,7 +377,7 @@ VStack {
 
 In preview,
 
-<img src="./imgs/button-style.png" \>
+<img src="./imgs/button-style.png" />
 
 If we want to customize the colors used for a bordered button, we can use the `tint()` modifier:
 
@@ -415,9 +389,7 @@ Button("Button 5") {}
 
 In preview,
 
-<img src="./imgs/button-tint.png" \>
-
-
+<img src="./imgs/button-tint.png" />
 
 If we want something completely custom, we can pass a custom label using a second trailing closure:
 
@@ -434,11 +406,7 @@ Button {
 
 In preview,
 
-<img src="./imgs/button-customize.png" \>
-
-
-
-
+<img src="./imgs/button-customize.png" />
 
 SwiftUI has a dedicated `Image` type for handling pictures in our apps:
 
@@ -462,7 +430,7 @@ Button {
 
 In preview,
 
-<img src="./imgs/button-icon.png" \>
+<img src="./imgs/button-icon.png" />
 
 If we want both text and image at the same time, we have two options:
 
@@ -487,9 +455,7 @@ Button {
 
 In preview,
 
-<img src="./imgs/button-label.png" \>
-
-
+<img src="./imgs/button-label.png" />
 
 ## Showing Alert Messages
 
@@ -520,13 +486,11 @@ struct ContentView: View {
 
 In preview,
 
-<img src="./imgs/alert.png" \>
+<img src="./imgs/alert.png" />
 
 - `alert("Important message", isPresented: $showingAlert)` - the first part is the alert title, and the second part is a two-way data binding to set `showingAlert` back to false when the alert is dismissed.
 
 - `Button("OK"){}` - has an empty closure, meaning that we are not assigning any funcitonality to run when the button is pressed, this is okay here because any button inside an alert will automatically dismiss the alert.
-
-
 
 We can add more buttons to our alert, and this is a good place to add roles to make sure it is clear what each button does:
 
@@ -539,7 +503,7 @@ We can add more buttons to our alert, and this is a good place to add roles to m
 
 In preview,
 
-<img src="./imgs/alert-buttons.png" \>
+<img src="./imgs/alert-buttons.png" />
 
 Finally, we can add message text to go alongside our title with a second trailing closure,
 
@@ -556,4 +520,4 @@ Button("Show Alert") {
 
 In preview,
 
-<img src="./imgs/alert-text.png" \>
+<img src="./imgs/alert-text.png" />

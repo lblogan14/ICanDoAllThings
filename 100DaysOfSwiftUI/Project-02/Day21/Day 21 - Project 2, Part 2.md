@@ -283,8 +283,6 @@ In preview,
 
 <img src="./imgs/image-shadow.png" />
 
-
-
 ## Upgrading Our Design
 
 We now want something fancier - a radial gradient with custom stops.
@@ -334,8 +332,6 @@ In preview,
 
 This resizes to take up all the horizontal space it needs, adds a little vertical padding, applies a background material so that it stands out from the red-blue gradient the background, and finally clips the whole thing into the shape of a rounded rectangle.
 
-
-
 Next step is to add a title before our main box, and a score placeholder after. This adds another `VStack` around what we have so far:
 
 ```swift
@@ -352,8 +348,28 @@ This adds a new title at the top:
 
 <img src="./imgs/title-box.png" />
 
+Asking for bold fonts is so common that there is a small shortcut: `.font(.largeTitle.bold())` to replace `.font(.largeTitle.weight(.bold))`.
 
+Next we also add a score label at the bottom of the new `VStack`:
 
-We just need a little tweak:
+```swift
+VStack {
+    Text.("Guess the Flag")
+        .font(.largeTitle.weight(.bold))
+        .foregroundStyle(.white)
+
+    // VStack(specing: 15) code
+
+    Text("Score: ???")
+        .font(.title.bold())
+        .foregroundStyle(.white)
+}
+```
+
+In preview,
+
+<img src="./imgs/score-label.png" />
+
+The title and score label look great with white text, but the text inside rounded box does not, and we just need a little tweak:
 
 <img src="./imgs/text-tweak.png" />

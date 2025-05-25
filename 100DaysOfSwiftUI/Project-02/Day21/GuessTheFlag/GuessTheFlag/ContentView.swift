@@ -58,6 +58,10 @@ struct ContentView: View {
                 .padding(.vertical, 20)
                 .background(.regularMaterial)
                 .clipShape(.rect(cornerRadius: 20))
+                
+                Text("Score: ???")
+                    .font(.title.bold())
+                    .foregroundStyle(.white)
             }
         }
         .alert(scoreTitle, isPresented: $showingScore) {

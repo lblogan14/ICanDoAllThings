@@ -157,3 +157,10 @@ For applications requiring higher durability, we can choose to additionally copy
 
 By default, data in the secondary region is not available for read or write access unless there is a failover event. Because data is replicated to the secondary region asynchronously, a failure that affects the primary region may result in data loss if the primary region can't be recovered.
 
+### Azure Storage Services
+Azure Storage platform provides
+- **Azure Blobs** - a massively scalable object store for text and binary data. Also including support for big data analytics through Data Lake Storage Gen2.
+- **Azure Files** - managed file shares for cloud or on-premises deployments.
+- **Azure Queues** - a messaging store for reliable messaging between application components.
+- **Azure Disks** - block-level storage volumes for Azure VMs.
+- **Azure Tables** - NoSQL table option for structured, non-relational data.

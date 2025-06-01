@@ -10,8 +10,6 @@ The user interface for this app will be made up of three main SwiftUI:
 
 - a `List` showing all the words they have entered previously.
 
-
-
 We need 
 
 - an array of words they have already used, 
@@ -44,8 +42,8 @@ var body: some View {
                 }
             }
         }
+        .navigationTitle(rootWord)
     }
-    .navigationTitle(rootWord)
 }
 ```
 
@@ -65,8 +63,6 @@ In our current text view, we cannot submit our answer after we type words into t
 
 4. Set `newWord` back to be an empty string
 
-
-
 ```swift
 func addNewWord() {
     // lowercase and trim the word to make sure we do not add duplicate words with case differences
@@ -84,8 +80,6 @@ func addNewWord() {
 
 We want to call `addNewWord()` when the user presses return on the keyboard, and in SwiftUI we can do this by adding an `onSubmit()` modifier somewhere in our view hierachy - it could be directly on the text field, but it can be anywhere else in the view because it will be triggered when *any text* is submitted.
 
-
-
 Note that `onSubmit()` needs to be given a function that accepts no parameters and returns nothing, which is exactly what `addNewWord()` does. So we can pass that in directly by adding this modifier below `navigationTitle()`:
 
 ```swift
@@ -102,10 +96,10 @@ NavigationStack {
             }
         }
     }
+    .navigationTitle(rootWord)
+    // add here
+    .onSubmit(addNewWord)
 }
-.navigationTitle(rootWord)
-// add here
-.onSubmit(addNewWord)
 ```
 
 In preview,
@@ -319,13 +313,3 @@ func addNewWord() {
     }
 }
 ```
-
-
-
-
-
-
-
-
-
-

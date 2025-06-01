@@ -23,7 +23,7 @@ struct ContentView: View {
                     TextField("Enter your word", text: $newWord)
                         .textInputAutocapitalization(.never)
                 }
-
+                
                 Section {
                     ForEach(usedWords, id: \.self) { word in
                         HStack {
@@ -33,29 +33,32 @@ struct ContentView: View {
                     }
                 }
             }
-        }
-        .navigationTitle(rootWord)
-        .onSubmit(addNewWord)
-        .onAppear(perform: startGame)
-        /*
-        .alert(errorTitle, isPresented: $showingError) {
-            Button("OK") {}
-        } message: {
-            Text(errorMessage)
-        }
-        */
-        .alert(errorTitle, isPresented: $showingError) {} message: {
-            Text(errorMessage)
+            .navigationTitle(rootWord)
+            .onSubmit(addNewWord)
+            .onAppear(perform: startGame)
+            /*
+            .alert(errorTitle, isPresented: $showingError) {
+                Button("OK") {}
+            } message: {
+                Text(errorMessage)
+            }
+            */
+            .alert(errorTitle, isPresented: $showingError) {} message: {
+                Text(errorMessage)
+            }
         }
     }
+        //
+        //
     
     func addNewWord() {
         // lowercase and trim the word to make sure we do not add duplicate words with case differences
         let answer = newWord.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-
+        
         // exit if the remaining string is empty
         guard answer.count > 0 else { return }
 
+        
         // extra validation to come
         guard isOriginal(word: answer) else {
             wordError(title: "Word used already", message: "Be more original")

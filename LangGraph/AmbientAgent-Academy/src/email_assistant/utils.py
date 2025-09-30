@@ -1,4 +1,5 @@
 """Utility functions for the email assistant."""
+from typing import List, Any
 
 
 def show_graph(graph, xray = False):
@@ -71,3 +72,45 @@ def format_email_markdown(subject, author, to, email_thread, email_id=None):
 
 ---
 """
+
+
+def format_messages_string(messages: List[Any]) -> str:
+    """Format messages into a single string for analysis."""
+    return "\n".join(message.pretty_repr() for message in messages)
+
+
+def extract_tool_calls(messages: List[Any]) -> List[str]:
+    """Extract tool call names from messages, safely handling messages without tool_calls."""
+    tool_call_names = []
+
+    for message in messages:
+        # Check if the message is a dict and has 'tool_calls' key
+        if isinstance(message, dict) and message.get('tool_calls'):
+            tool_call_names.extend(
+                [call['name'].lower() for call in message['tool_calls']]
+            )
+        # Check if message is an object with 'tool_calls' attribute
+        elif hasattr(message, 'tool_calls') and message.tool_calls:
+            tool_call_names.extend(
+                [call['name'].lower() for call in message.tool_calls]
+            )
+
+    return tool_call_names
+
+
+def extract_tool_calls(messages: List[Any]) -> List[str]:
+    """Extract tool call names from messages, safely handling messages without tool_calls."""
+    tool_call_names = []
+    for message in messages:
+        # Check if message is a dict and has tool_calls
+        if isinstance(message, dict) and message.get("tool_calls"):
+            tool_call_names.extend([call["name"].lower() for call in message["tool_calls"]])
+        # Check if message is an object with tool_calls attribute
+        elif hasattr(message, "tool_calls") and message.tool_calls:
+            tool_call_names.extend([call["name"].lower() for call in message.tool_calls])
+    
+    return tool_call_names
+
+def format_messages_string(messages: List[Any]) -> str:
+    """Format messages into a single string for analysis."""
+    return '\n'.join(message.pretty_repr() for message in messages)

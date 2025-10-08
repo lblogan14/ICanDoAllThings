@@ -1,5 +1,6 @@
 """Utility functions for the email assistant."""
 from typing import List, Any
+import json
 
 
 def show_graph(graph, xray = False):
@@ -114,3 +115,49 @@ def extract_tool_calls(messages: List[Any]) -> List[str]:
 def format_messages_string(messages: List[Any]) -> str:
     """Format messages into a single string for analysis."""
     return '\n'.join(message.pretty_repr() for message in messages)
+
+
+def format_for_display(tool_call):
+    """Format content for display in Agent Inbox
+    
+    Args:
+        tool_call: The tool call to format
+    """
+    # Initialize empty display
+    display = ""
+    
+    # Add tool call information
+    if tool_call["name"] == "write_email":
+        display += f"""# Email Draft
+
+**To**: {tool_call["args"].get("to")}
+**Subject**: {tool_call["args"].get("subject")}
+
+{tool_call["args"].get("content")}
+"""
+    elif tool_call["name"] == "schedule_meeting":
+        display += f"""# Calendar Invite
+
+**Meeting**: {tool_call["args"].get("subject")}
+**Attendees**: {', '.join(tool_call["args"].get("attendees"))}
+**Duration**: {tool_call["args"].get("duration_minutes")} minutes
+**Day**: {tool_call["args"].get("preferred_day")}
+"""
+    elif tool_call["name"] == "Question":
+        # Special formatting for questions to make them clear
+        display += f"""# Question for User
+
+{tool_call["args"].get("content")}
+"""
+    else:
+        # Generic format for other tools
+        display += f"""# Tool Call: {tool_call["name"]}
+
+Arguments:"""
+        
+        # Check if args is a dictionary or string
+        if isinstance(tool_call["args"], dict):
+            display += f"\n{json.dumps(tool_call['args'], indent=2)}\n"
+        else:
+            display += f"\n{tool_call['args']}\n"
+    return display

@@ -10,6 +10,15 @@ def get_shipment():
         'status': 'in transit',
     }
 
+
+@app.get("/shipment/{id}")
+def get_shipment_id(id: int) -> dict[str, str | int]:
+    return {
+        'id': id,
+        'content': 'wooden table',
+        'status': 'in transit',
+    }
+
 @app.get("/scalar", include_in_schema=False)
 def get_scalar_docs():
     return get_scalar_api_reference(

@@ -37,12 +37,19 @@ shipments = {
     }
 }
 
+
+# Endpoint to get shipment details by ID (query parameter)
 @app.get("/shipment")
-def get_shipment():
-    return {
-        'content': 'wooden table',
-        'status': 'in transit',
-    }
+def get_shipment(id: int | None = None) -> dict[str, Any]:
+    if not id:
+        id = max(shipments.keys())
+        return shipments[id]
+        
+    if id not in shipments:
+        return {
+            "detail": "Given ID does not exist!"
+        }
+    return shipments[id]
 
 
 @app.get("/shipment/latest")

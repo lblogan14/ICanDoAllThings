@@ -101,6 +101,25 @@ def shipment_update(
     return shipments[id]
 
 
+@app.patch("/shipment")
+def patch_shipment(
+    id: int, 
+    content: str | None = None, 
+    weight: float | None = None, 
+    status: str | None = None
+):
+    shipment = shipments[id]
+    # Update the provided fields only
+    if content:
+        shipment['content'] = content
+    if weight:
+        shipment['weight'] = weight
+    if status:
+        shipment['status'] = status
+
+    shipments[id] = shipment
+    return shipment
+
 
 @app.get("/scalar", include_in_schema=False)
 def get_scalar_docs():

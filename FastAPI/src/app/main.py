@@ -78,9 +78,7 @@ def submit_shipment(content: str, weight: float) -> dict[str, int]:
         'status': 'placed'
     }
 
-    return {
-        'id': new_id,
-    }
+    return {'id': new_id}
 
 
 @app.get("/shipment/{field}")
@@ -89,6 +87,18 @@ def get_shipment_field(field: str, id: int) -> dict[str, Any]:
         field: shipments[id][field]
     }
 
+
+@app.put("/shipment")
+def shipment_update(
+    id: int, content: str, weight: float, status: str
+) -> dict[str, Any]:
+    shipments[id] = {
+        'weight': weight,
+        'content': content,
+        'status': status,
+    }
+
+    return shipments[id]
 
 
 

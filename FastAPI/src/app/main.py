@@ -60,15 +60,6 @@ def get_latest_shipment():
     return shipments[id]
 
 
-@app.get("/shipment/{id}")
-def get_shipment_id(id: int) -> dict[str, Any]:
-    if id not in shipments:
-        return {
-            "detail": "Given ID does not exist!"
-        }
-
-    return shipments[id]
-
 
 @app.post("/shipment")
 def submit_shipment(content: str, weight: float) -> dict[str, int]:
@@ -91,6 +82,12 @@ def submit_shipment(content: str, weight: float) -> dict[str, int]:
         'id': new_id,
     }
 
+
+@app.get("/shipment/{field}")
+def get_shipment_field(field: str, id: int) -> dict[str, Any]:
+    return {
+        field: shipments[id][field]
+    }
 
 
 

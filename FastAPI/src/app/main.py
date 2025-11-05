@@ -70,6 +70,30 @@ def get_shipment_id(id: int) -> dict[str, Any]:
     return shipments[id]
 
 
+@app.post("/shipment")
+def submit_shipment(content: str, weight: float) -> dict[str, int]:
+    if weight > 25:
+        raise HTTPException(
+            status_code=status.HTTP_406_NOT_ACCEPTABLE,
+            detail="Maximum weight limit is 25 units."
+        )
+
+    # Find the next available ID
+    new_id = max(shipments.keys()) + 1
+    # Create a new shipment entry
+    shipments[new_id] = {
+        'weight': weight,
+        'content': content,
+        'status': 'placed'
+    }
+
+    return {
+        'id': new_id,
+    }
+
+
+
+
 
 @app.get("/scalar", include_in_schema=False)
 def get_scalar_docs():
